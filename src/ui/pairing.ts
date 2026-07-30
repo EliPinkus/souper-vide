@@ -16,14 +16,16 @@ export interface PairingContent {
 
 export const NANO_PAIRING: PairingContent = {
   steps: [
-    'Plug the cooker in. It powers up advertising — there is no pairing button, no PIN, and nothing to confirm on the device.',
+    'Plug the cooker in and leave it alone. It advertises on its own — you do not need the button-hold sequence here.',
     'Close the Anova app on any phone or tablet in range. A held Bluetooth connection is the usual reason the cooker never reaches the picker.',
-    'Click Connect, then choose the cooker. The picker is filtered to Anova’s service UUID, so it should be the only thing offered.',
+    'Click Connect, then choose the cooker. The picker matches on Anova’s service UUID or a name starting with “Anova”.',
   ],
   troubleshooting: [
-    'Nothing listed? Something else is almost certainly connected to it. Force-quit the Anova app rather than just backgrounding it.',
-    'Unplugging the cooker for ten seconds resets its radio and clears a wedged connection.',
-    'It should be within a few metres for the first connection; range improves once connected.',
+    'Holding minus + timer for 10 seconds is Anova’s clear-credentials reset, not a pairing mode. It wipes the cooker’s stored pairing and reboots it, and Anova says to unplug and replug afterwards — until you do, it may not be advertising at all.',
+    'If you just ran that reset: unplug the cooker, wait ten seconds, plug it back in, then try Connect again.',
+    'Nothing listed at all? Use “Show every Bluetooth device” below. The Nano may not put its service UUID in its advertisement, which would filter it out of the normal picker even though it is right there.',
+    'macOS asks each browser for Bluetooth permission separately. If Chrome was ever denied, every chooser comes up empty and silently — check System Settings › Privacy & Security › Bluetooth.',
+    'Force-quit the Anova app rather than just backgrounding it, and keep the cooker within a few metres for the first connection.',
   ],
 };
 
@@ -37,6 +39,7 @@ export const PROBE_PAIRING: PairingContent = {
     'The probe accepts 3 simultaneous Bluetooth connections. At 3 it switches to unconnectable advertising and vanishes from the picker — disconnect a Display, a Booster, or the Combustion app to free a slot.',
     'A probe sitting in its charger does not advertise at all. That is the most common reason it never appears.',
     'Readings jumping around in single digits usually means the probe is in Instant Read mode, where only T1 reports and the other seven sensors read zero.',
+    'macOS asks each browser for Bluetooth permission separately. If Chrome was ever denied, every chooser comes up empty and silently — check System Settings › Privacy & Security › Bluetooth.',
   ],
 };
 

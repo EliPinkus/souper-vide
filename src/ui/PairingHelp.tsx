@@ -7,9 +7,12 @@ interface PairingHelpProps {
   startOpen: boolean;
   /** Expands the panel automatically when a connection attempt fails. */
   error: string | null;
+  /** Opens an unfiltered chooser listing every advertising device. */
+  onConnectAny: () => void;
+  disabled: boolean;
 }
 
-export function PairingHelp({ content, startOpen, error }: PairingHelpProps) {
+export function PairingHelp({ content, startOpen, error, onConnectAny, disabled }: PairingHelpProps) {
   const [open, setOpen] = useState(startOpen);
 
   // A failed connection is exactly when these steps become worth reading.
@@ -35,6 +38,17 @@ export function PairingHelp({ content, startOpen, error }: PairingHelpProps) {
           <li key={tip}>{tip}</li>
         ))}
       </ul>
+
+      <div className="pairing-escape">
+        <button type="button" className="ghost wide" onClick={onConnectAny} disabled={disabled}>
+          Show every Bluetooth device
+        </button>
+        <small>
+          Chrome can only filter on what a device puts in its advertisement, not on the services it
+          turns out to have once connected. If the filtered list is empty, this unfiltered one will
+          still find it — you just have to spot it yourself.
+        </small>
+      </div>
     </details>
   );
 }

@@ -469,6 +469,22 @@ button.wide {
   color: var(--text-dim);
 }
 
+.pairing-escape {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.pairing-escape small {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
 .pairing-subhead {
   margin: 0.9rem 0 0;
   font-size: 0.72rem;

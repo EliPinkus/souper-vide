@@ -60,6 +60,7 @@ export function ProbeCard({ probe, displayUnit }: ProbeCardProps) {
       error={probe.error}
       pairing={PROBE_PAIRING}
       onConnect={probe.connect}
+      onConnectAny={probe.connectAny}
       onReconnect={probe.reconnect}
       onDisconnect={probe.disconnect}
       onDismissError={probe.clearError}

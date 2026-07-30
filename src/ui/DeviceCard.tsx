@@ -12,6 +12,7 @@ interface DeviceCardProps {
   canReconnect: boolean;
   error: string | null;
   pairing: PairingContent;
+  onConnectAny: () => void;
   onConnect: () => void;
   onReconnect: () => void;
   onDisconnect: () => void;
@@ -34,6 +35,7 @@ export function DeviceCard({
   canReconnect,
   error,
   pairing,
+  onConnectAny,
   onConnect,
   onReconnect,
   onDisconnect,
@@ -93,7 +95,13 @@ export function DeviceCard({
 
       {/* Only useful while there is nothing to connect to; hidden once live. */}
       {state !== 'connected' && (
-        <PairingHelp content={pairing} startOpen={!canReconnect} error={error} />
+        <PairingHelp
+          content={pairing}
+          startOpen={!canReconnect}
+          error={error}
+          onConnectAny={onConnectAny}
+          disabled={state === 'connecting'}
+        />
       )}
 
       <div className={`card-body ${state === 'connected' ? '' : 'inactive'}`}>{children}</div>

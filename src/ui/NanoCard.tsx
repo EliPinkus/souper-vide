@@ -66,6 +66,7 @@ export function NanoCard({ nano, displayUnit }: NanoCardProps) {
       error={nano.error}
       pairing={NANO_PAIRING}
       onConnect={nano.connect}
+      onConnectAny={nano.connectAny}
       onReconnect={nano.reconnect}
       onDisconnect={nano.disconnect}
       onDismissError={nano.clearError}

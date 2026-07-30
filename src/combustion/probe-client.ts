@@ -10,6 +10,7 @@ import {
   UART_TX_CHAR_UUID,
   UartMessageType,
 } from './constants';
+import { assertBluetoothAvailable, type ConnectOptions } from '../ble/availability';
 import type { Bytes } from '../ble/bytes';
 import { parseProbeStatus, type ProbeStatus } from './probe-status';
 import {
@@ -79,15 +80,22 @@ export class ProbeClient {
   }
 
   /** Opens Chrome's device chooser. Must be called from a user gesture. */
-  async connect(): Promise<void> {
-    if (!navigator.bluetooth) {
-      throw new Error('Web Bluetooth is not available in this browser.');
-    }
+  async connect(options: ConnectOptions = {}): Promise<void> {
+    await assertBluetoothAvailable();
 
-    this.device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [PROBE_STATUS_SERVICE_UUID] }],
-      optionalServices: [PROBE_STATUS_SERVICE_UUID, UART_SERVICE_UUID, DEVICE_INFO_SERVICE_UUID],
-    });
+    // Combustion documents the Probe Status UUID as being in the scan response,
+    // so the filter should hold. The probe advertises no name, so there is no
+    // useful name prefix to OR in — acceptAll is the only widening available.
+    const optionalServices = [
+      PROBE_STATUS_SERVICE_UUID,
+      UART_SERVICE_UUID,
+      DEVICE_INFO_SERVICE_UUID,
+    ];
+    this.device = await navigator.bluetooth.requestDevice(
+      options.acceptAllDevices
+        ? { acceptAllDevices: true, optionalServices }
+        : { filters: [{ services: [PROBE_STATUS_SERVICE_UUID] }], optionalServices },
+    );
 
     this.device.addEventListener('gattserverdisconnected', this.handleDisconnect);
     await this.openGatt();
@@ -105,7 +113,15 @@ export class ProbeClient {
     this.parser.reset();
     this.server = await this.device.gatt.connect();
 
-    const statusService = await this.server.getPrimaryService(PROBE_STATUS_SERVICE_UUID);
+    let statusService: BluetoothRemoteGATTService;
+    try {
+      statusService = await this.server.getPrimaryService(PROBE_STATUS_SERVICE_UUID);
+    } catch {
+      throw new Error(
+        `“${this.device.name ?? 'That device'}” does not expose Combustion's Probe Status service, so it is probably not the probe.`,
+      );
+    }
+
     const statusChar = await statusService.getCharacteristic(PROBE_STATUS_CHAR_UUID);
     statusChar.addEventListener('characteristicvaluechanged', this.handleStatusNotification);
     await statusChar.startNotifications();

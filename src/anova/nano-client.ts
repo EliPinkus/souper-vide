@@ -6,6 +6,7 @@ import {
   SensorValueList,
   SysAlertBitVector,
 } from './generated/nano.js';
+import { assertBluetoothAvailable, type ConnectOptions } from '../ble/availability';
 import type { Bytes } from '../ble/bytes';
 import { CobsFramer, cobsDecode, cobsEncode } from '../ble/cobs';
 import {
@@ -123,15 +124,21 @@ export class NanoClient {
   }
 
   /** Opens Chrome's device chooser. Must be called from a user gesture. */
-  async connect(): Promise<void> {
-    if (!navigator.bluetooth) {
-      throw new Error('Web Bluetooth is not available in this browser.');
-    }
+  async connect(options: ConnectOptions = {}): Promise<void> {
+    await assertBluetoothAvailable();
 
-    this.device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [NANO_SERVICE_UUID] }],
-      optionalServices: [NANO_SERVICE_UUID],
-    });
+    // Anova documents the service UUID but says nothing about whether the Nano
+    // advertises it, and a filter that matches only advertised data yields an
+    // empty chooser if it doesn't. Filters are OR'd, so the name prefix is a
+    // second chance at seeing the cooker before falling back to acceptAll.
+    this.device = await navigator.bluetooth.requestDevice(
+      options.acceptAllDevices
+        ? { acceptAllDevices: true, optionalServices: [NANO_SERVICE_UUID] }
+        : {
+            filters: [{ services: [NANO_SERVICE_UUID] }, { namePrefix: 'Anova' }],
+            optionalServices: [NANO_SERVICE_UUID],
+          },
+    );
 
     this.device.addEventListener('gattserverdisconnected', this.handleDisconnect);
     await this.openGatt();
@@ -150,7 +157,17 @@ export class NanoClient {
     this.asyncFramer.reset();
     this.server = await this.device.gatt.connect();
 
-    const service = await this.server.getPrimaryService(NANO_SERVICE_UUID);
+    // Picking from an unfiltered chooser makes "wrong device" a real outcome,
+    // so name it rather than surfacing a raw GATT error.
+    let service: BluetoothRemoteGATTService;
+    try {
+      service = await this.server.getPrimaryService(NANO_SERVICE_UUID);
+    } catch {
+      throw new Error(
+        `“${this.device.name ?? 'That device'}” does not expose Anova's cooker service, so it is probably not the Nano.`,
+      );
+    }
+
     this.txChar = await service.getCharacteristic(NANO_TX_CHAR_UUID);
 
     const rxChar = await service.getCharacteristic(NANO_RX_CHAR_UUID);

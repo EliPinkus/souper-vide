@@ -15,6 +15,8 @@ export interface NanoController {
   /** A device has been chosen at least once, so Reconnect is meaningful. */
   canReconnect: boolean;
   connect: () => Promise<void>;
+  /** Opens an unfiltered chooser, for when the filtered one comes up empty. */
+  connectAny: () => Promise<void>;
   reconnect: () => Promise<void>;
   disconnect: () => void;
   setTargetTemp: (temp: number) => Promise<void>;
@@ -63,19 +65,22 @@ export function useNano(): NanoController {
     [],
   );
 
-  const connect = useCallback(async () => {
-    setState('connecting');
-    setError(null);
-    try {
-      await client.connect();
-      setDeviceName(client.deviceName);
-      setCanReconnect(true);
-      setState('connected');
-    } catch (err) {
-      setError(describeError(err));
-      setState('disconnected');
-    }
-  }, [client]);
+  const connect = useCallback(
+    async (acceptAllDevices = false) => {
+      setState('connecting');
+      setError(null);
+      try {
+        await client.connect({ acceptAllDevices });
+        setDeviceName(client.deviceName);
+        setCanReconnect(true);
+        setState('connected');
+      } catch (err) {
+        setError(describeError(err));
+        setState('disconnected');
+      }
+    },
+    [client],
+  );
 
   const reconnect = useCallback(async () => {
     setState('connecting');
@@ -101,7 +106,8 @@ export function useNano(): NanoController {
     error,
     busy,
     canReconnect,
-    connect,
+    connect: () => connect(false),
+    connectAny: () => connect(true),
     reconnect,
     disconnect,
     setTargetTemp: (temp) => run(() => client.setTargetTemp(temp)),

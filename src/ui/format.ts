@@ -51,7 +51,11 @@ export function formatAge(timestamp: number): string {
 /** Turns a thrown value into something worth showing a user. */
 export function describeError(error: unknown): string {
   if (error instanceof Error) {
-    if (error.name === 'NotFoundError') return 'No device selected.';
+    // Chrome reports a cancelled chooser and an empty chooser identically, and
+    // "no device selected" reads as user error when the list was in fact blank.
+    if (error.name === 'NotFoundError') {
+      return 'No device chosen. If the list was empty, try “Show every Bluetooth device” below.';
+    }
     if (error.name === 'SecurityError') return 'Bluetooth access was blocked. The page must be served over HTTPS or localhost.';
     if (error.name === 'NetworkError') return 'Connection failed. Make sure the device is on, in range, and not connected to another app.';
     return error.message;

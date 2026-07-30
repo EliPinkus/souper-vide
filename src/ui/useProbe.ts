@@ -13,6 +13,8 @@ export interface ProbeController {
   busy: boolean;
   canReconnect: boolean;
   connect: () => Promise<void>;
+  /** Opens an unfiltered chooser, for when the filtered one comes up empty. */
+  connectAny: () => Promise<void>;
   reconnect: () => Promise<void>;
   disconnect: () => void;
   /** Removal target, in °C — the probe's native unit. */
@@ -56,20 +58,23 @@ export function useProbe(): ProbeController {
     }
   }, []);
 
-  const connect = useCallback(async () => {
-    setState('connecting');
-    setError(null);
-    try {
-      await client.connect();
-      setDeviceName(client.deviceName);
-      setInfo(client.deviceInfo);
-      setCanReconnect(true);
-      setState('connected');
-    } catch (err) {
-      setError(describeError(err));
-      setState('disconnected');
-    }
-  }, [client]);
+  const connect = useCallback(
+    async (acceptAllDevices = false) => {
+      setState('connecting');
+      setError(null);
+      try {
+        await client.connect({ acceptAllDevices });
+        setDeviceName(client.deviceName);
+        setInfo(client.deviceInfo);
+        setCanReconnect(true);
+        setState('connected');
+      } catch (err) {
+        setError(describeError(err));
+        setState('disconnected');
+      }
+    },
+    [client],
+  );
 
   const reconnect = useCallback(async () => {
     setState('connecting');
@@ -97,7 +102,8 @@ export function useProbe(): ProbeController {
     error,
     busy,
     canReconnect,
-    connect,
+    connect: () => connect(false),
+    connectAny: () => connect(true),
     reconnect,
     disconnect,
     setRemovalTarget: (celsius) => run(() => client.setRemovalTarget(celsius)),
