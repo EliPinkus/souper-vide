@@ -10,6 +10,32 @@ export const NANO_TX_CHAR_UUID = '0e140001-0af1-4582-a242-773e63054c68'; // writ
 export const NANO_RX_CHAR_UUID = '0e140002-0af1-4582-a242-773e63054c68'; // notify — command responses
 export const NANO_ASYNC_CHAR_UUID = '0e140003-0af1-4582-a242-773e63054c68'; // notify — unsolicited alerts
 
+/**
+ * Anova ships at least three mutually incompatible BLE protocols, and the model
+ * name on the box does not tell you which one a given unit speaks. The
+ * developer docs treat them as separate device families:
+ *
+ *  - Nano          protobuf + COBS on 0e140000-…
+ *  - A2/A3         ASCII commands terminated by \r on 0000ffe0-…
+ *  - Mini          base64-wrapped JSON on 910772a8-…
+ *
+ * An "Anova Precision Cooker Nano 3.0" has been observed exposing the ASCII
+ * service rather than the protobuf one, so the client probes for all of these
+ * and speaks whichever it actually finds.
+ */
+export const ANOVA_ASCII_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
+/** Single characteristic used for both writes and notifications. */
+export const ANOVA_ASCII_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+/** Recognized but not implemented; probed so the app can say what it found. */
+export const ANOVA_MINI_SERVICE_UUID = '910772a8-a5e7-49a7-bc6d-701e9a783a5c';
+
+export const ANOVA_CANDIDATE_SERVICES = [
+  { uuid: NANO_SERVICE_UUID, label: 'Nano protobuf protocol' },
+  { uuid: ANOVA_ASCII_SERVICE_UUID, label: 'ASCII serial protocol' },
+  { uuid: ANOVA_MINI_SERVICE_UUID, label: 'Precision Cooker Mini protocol' },
+] as const;
+
 /** Max bytes per GATT write. The Nano's framing assumes 20-byte chunks. */
 export const NANO_CHUNK_SIZE = 20;
 

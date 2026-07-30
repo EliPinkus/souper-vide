@@ -203,6 +203,12 @@ export function NanoCard({ nano, displayUnit }: NanoCardProps) {
           Stop
         </button>
       </div>
+
+      {status.protocol && (
+        <footer className="card-footer">
+          <span>Speaking {status.protocol}</span>
+        </footer>
+      )}
     </DeviceCard>
   );
 }
