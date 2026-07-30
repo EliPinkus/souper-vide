@@ -7,6 +7,7 @@ import {
   NANO_SERVICE_UUID,
   type TempUnit,
 } from './constants';
+import { MiniTransport } from './mini-transport';
 import { ProtobufTransport } from './protobuf-transport';
 import type { NanoSnapshot, NanoTransport } from './transport';
 
@@ -47,9 +48,10 @@ export interface NanoClientEvents {
  *
  * Anova has shipped at least three incompatible BLE protocols across its
  * cookers, and the model name does not reliably predict which one a unit
- * implements — hardware sold as a "Nano 3.0" has been seen exposing the ASCII
- * service documented for the A2/A3. So rather than assuming, this probes the
- * known services in order and reports what it found.
+ * implements — hardware sold as a "Precision Cooker Nano 3.0" turns out to
+ * speak the Gen 3 JSON protocol that Anova documents under the Mini, not the
+ * protobuf protocol documented under the Nano. So rather than trusting the
+ * label, this probes the known services and reports what it actually found.
  */
 export class NanoClient {
   private device: BluetoothDevice | null = null;
@@ -144,13 +146,10 @@ export class NanoClient {
     const ascii = found.find((entry) => entry.uuid === ANOVA_ASCII_SERVICE_UUID);
     if (ascii) return AsciiTransport.attach(ascii.service);
 
-    const name = this.device?.name ?? 'That device';
-    if (found.some((entry) => entry.uuid === ANOVA_MINI_SERVICE_UUID)) {
-      throw new Error(
-        `“${name}” speaks Anova's Precision Cooker Mini protocol, which this app does not implement yet.`,
-      );
-    }
+    const mini = found.find((entry) => entry.uuid === ANOVA_MINI_SERVICE_UUID);
+    if (mini) return MiniTransport.attach(mini.service);
 
+    const name = this.device?.name ?? 'That device';
     throw new Error(
       `“${name}” connected, but exposes none of Anova's known cooker services ` +
         `(${ANOVA_CANDIDATE_SERVICES.map((c) => c.label).join(', ')}). ` +

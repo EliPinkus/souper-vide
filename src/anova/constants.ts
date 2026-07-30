@@ -27,8 +27,24 @@ export const ANOVA_ASCII_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
 /** Single characteristic used for both writes and notifications. */
 export const ANOVA_ASCII_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
-/** Recognized but not implemented; probed so the app can say what it found. */
+/**
+ * Anova's "Gen 3" protocol — base64-wrapped JSON over dedicated read/write
+ * characteristics. Their reference implementation calls it the Precision Cooker
+ * Mini protocol, but hardware badged "Precision Cooker Nano 3.0" speaks it too,
+ * which the `GEN_3_` prefix in Anova's own source rather gives away.
+ *
+ * UUIDs are taken from the reference implementation, not the docs page: the two
+ * disagree on SET_CLOCK (`96e3` in code, `96c3` in prose) and working code wins.
+ */
 export const ANOVA_MINI_SERVICE_UUID = '910772a8-a5e7-49a7-bc6d-701e9a783a5c';
+export const MINI_CHARS = {
+  setTemperature: '0f5639f7-3c4e-47d0-9496-0672c89ea48a',
+  currentTemperature: '6ffdca46-d6a8-4fb2-8fd9-c6330f1939e3',
+  timer: 'a2b179f8-944e-436f-a246-c66caaf7061f',
+  state: '54e53c60-367a-4783-a5c1-b1770c54142b',
+  setClock: 'd8a89692-cae8-4b74-96e3-0b99d3637793',
+  systemInfo: '153c9432-7c83-4b88-9252-7588229d5473',
+} as const;
 
 export const ANOVA_CANDIDATE_SERVICES = [
   { uuid: NANO_SERVICE_UUID, label: 'Nano protobuf protocol' },

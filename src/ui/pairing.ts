@@ -25,6 +25,8 @@ export const NANO_PAIRING: PairingContent = {
     'If you just ran that reset: unplug the cooker, wait ten seconds, plug it back in, then try Connect again.',
     'Nothing listed at all? Use “Show every Bluetooth device” below. The Nano may not put its service UUID in its advertisement, which would filter it out of the normal picker even though it is right there.',
     'macOS asks each browser for Bluetooth permission separately. If Chrome was ever denied, every chooser comes up empty and silently — check System Settings › Privacy & Security › Bluetooth.',
+    'If your macOS asks you to confirm a Bluetooth pairing, accept it. Anova\u2019s Gen 3 cookers (Mini, Nano 3.0) drop the connection if pairing is declined.',
+    'A Gen 3 cooker that will not pair can be reset by holding its top button for about 10 seconds until the light goes out.',
     'Force-quit the Anova app rather than just backgrounding it, and keep the cooker within a few metres for the first connection.',
   ],
 };

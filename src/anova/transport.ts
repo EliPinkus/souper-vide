@@ -17,6 +17,12 @@ export interface NanoSnapshot {
   waterLeak: boolean;
   motorSpeed: number | null;
   heaterTemp: number | null;
+  /**
+   * Undecoded protocol payloads, for protocols whose schema Anova has not
+   * published. Surfaced in the UI so an unexpected shape is inspectable rather
+   * than silently swallowed.
+   */
+  raw?: unknown;
 }
 
 export const EMPTY_SNAPSHOT: NanoSnapshot = {

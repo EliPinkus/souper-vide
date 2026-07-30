@@ -204,6 +204,15 @@ export function NanoCard({ nano, displayUnit }: NanoCardProps) {
         </button>
       </div>
 
+      {/* Anova does not publish the Gen 3 state schema, so anything this app
+          could not interpret stays visible rather than being swallowed. */}
+      {status.raw !== undefined && (
+        <details className="sensors">
+          <summary>Raw device state</summary>
+          <pre className="raw-json">{JSON.stringify(status.raw, null, 2)}</pre>
+        </details>
+      )}
+
       {status.protocol && (
         <footer className="card-footer">
           <span>Speaking {status.protocol}</span>
