@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { PairingHelp } from './PairingHelp';
+import type { PairingContent } from './pairing';
 import type { ConnectionState } from './useNano';
 
 interface DeviceCardProps {
@@ -9,6 +11,7 @@ interface DeviceCardProps {
   deviceName: string | null;
   canReconnect: boolean;
   error: string | null;
+  pairing: PairingContent;
   onConnect: () => void;
   onReconnect: () => void;
   onDisconnect: () => void;
@@ -30,6 +33,7 @@ export function DeviceCard({
   deviceName,
   canReconnect,
   error,
+  pairing,
   onConnect,
   onReconnect,
   onDisconnect,
@@ -85,6 +89,11 @@ export function DeviceCard({
             ×
           </button>
         </div>
+      )}
+
+      {/* Only useful while there is nothing to connect to; hidden once live. */}
+      {state !== 'connected' && (
+        <PairingHelp content={pairing} startOpen={!canReconnect} error={error} />
       )}
 
       <div className={`card-body ${state === 'connected' ? '' : 'inactive'}`}>{children}</div>

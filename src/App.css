@@ -420,6 +420,64 @@ button.wide {
   font-weight: 600;
 }
 
+/* --------------------------------------------------------------- pairing */
+
+.pairing {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.pairing summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  list-style-position: outside;
+}
+
+.pairing summary::marker {
+  color: var(--text-dim);
+}
+
+.pairing-steps,
+.pairing-tips {
+  margin: 0.7rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--text-dim);
+}
+
+.pairing-steps li,
+.pairing-tips li {
+  margin-bottom: 0.45rem;
+}
+
+.pairing-steps li::marker {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pairing-note {
+  margin: 0.7rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border-left: 2px solid var(--accent);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-dim);
+}
+
+.pairing-subhead {
+  margin: 0.9rem 0 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
 /* --------------------------------------------------------------- sensors */
 
 .sensors summary {

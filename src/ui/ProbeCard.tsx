@@ -9,6 +9,7 @@ import {
 } from '../combustion/constants';
 import { DeviceCard, Readout } from './DeviceCard';
 import { displayFromC, formatCelsius, formatDuration } from './format';
+import { PROBE_PAIRING } from './pairing';
 import type { ProbeController } from './useProbe';
 
 interface ProbeCardProps {
@@ -57,6 +58,7 @@ export function ProbeCard({ probe, displayUnit }: ProbeCardProps) {
       deviceName={probe.deviceName}
       canReconnect={probe.canReconnect}
       error={probe.error}
+      pairing={PROBE_PAIRING}
       onConnect={probe.connect}
       onReconnect={probe.reconnect}
       onDisconnect={probe.disconnect}

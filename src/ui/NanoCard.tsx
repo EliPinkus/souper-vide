@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TEMP_LIMITS, type TempUnit } from '../anova/constants';
 import { DeviceCard, Readout } from './DeviceCard';
 import { convertTemp, formatMinutes, formatTemp } from './format';
+import { NANO_PAIRING } from './pairing';
 import type { NanoController } from './useNano';
 
 interface NanoCardProps {
@@ -63,6 +64,7 @@ export function NanoCard({ nano, displayUnit }: NanoCardProps) {
       deviceName={nano.deviceName}
       canReconnect={nano.canReconnect}
       error={nano.error}
+      pairing={NANO_PAIRING}
       onConnect={nano.connect}
       onReconnect={nano.reconnect}
       onDisconnect={nano.disconnect}
