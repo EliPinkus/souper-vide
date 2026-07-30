@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EMPTY_NANO_STATUS, NanoClient, type NanoStatus } from '../anova/nano-client';
 import type { TempUnit } from '../anova/constants';
-import { describeError } from './format';
+import { describeError, logBleError } from './format';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected';
 
@@ -75,6 +75,7 @@ export function useNano(): NanoController {
         setCanReconnect(true);
         setState('connected');
       } catch (err) {
+        logBleError('Anova connect', err);
         setError(describeError(err));
         setState('disconnected');
       }
@@ -89,6 +90,7 @@ export function useNano(): NanoController {
       await client.reconnect();
       setState('connected');
     } catch (err) {
+      logBleError('Anova reconnect', err);
       setError(describeError(err));
       setState('disconnected');
     }

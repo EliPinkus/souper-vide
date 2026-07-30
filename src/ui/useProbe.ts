@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ProbeClient, type ProbeInfo } from '../combustion/probe-client';
 import type { ProbeStatus } from '../combustion/probe-status';
-import { describeError } from './format';
+import { describeError, logBleError } from './format';
 import type { ConnectionState } from './useNano';
 
 export interface ProbeController {
@@ -52,6 +52,7 @@ export function useProbe(): ProbeController {
     try {
       await action();
     } catch (err) {
+      logBleError('Combustion probe command', err);
       setError(describeError(err));
     } finally {
       setBusy(false);
@@ -69,6 +70,7 @@ export function useProbe(): ProbeController {
         setCanReconnect(true);
         setState('connected');
       } catch (err) {
+        logBleError('Combustion probe connect', err);
         setError(describeError(err));
         setState('disconnected');
       }
@@ -84,6 +86,7 @@ export function useProbe(): ProbeController {
       setInfo(client.deviceInfo);
       setState('connected');
     } catch (err) {
+      logBleError('Combustion probe reconnect', err);
       setError(describeError(err));
       setState('disconnected');
     }

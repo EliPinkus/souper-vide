@@ -48,16 +48,34 @@ export function formatAge(timestamp: number): string {
   return `${Math.round(seconds / 60)}m ago`;
 }
 
+/**
+ * Logs the untouched error before any prettifying, so DevTools always has the
+ * exact `name` and `message` Chrome produced. The on-screen text is a summary;
+ * this is the record.
+ */
+export function logBleError(context: string, error: unknown): void {
+  const detail =
+    error instanceof Error ? { name: error.name, message: error.message } : { value: error };
+  console.error(`[SouperVide] ${context} failed`, detail, error);
+}
+
 /** Turns a thrown value into something worth showing a user. */
 export function describeError(error: unknown): string {
   if (error instanceof Error) {
-    // Chrome reports a cancelled chooser and an empty chooser identically, and
-    // "no device selected" reads as user error when the list was in fact blank.
+    // Chrome raises NotFoundError both for a cancelled chooser and for a
+    // selection that failed to complete, so its own wording is the only thing
+    // that distinguishes them. Never discard it — quote it and add the hint.
     if (error.name === 'NotFoundError') {
-      return 'No device chosen. If the list was empty, try “Show every Bluetooth device” below.';
+      const cancelled = /cancell?ed/i.test(error.message);
+      const hint = cancelled
+        ? 'If you did click Pair rather than cancelling, the cooker most likely stopped advertising before the selection completed — reset it and try again straight away.'
+        : 'If the list was empty, try “Show every Bluetooth device” below.';
+      return `${hint} (Chrome said: ${error.message})`;
     }
     if (error.name === 'SecurityError') return 'Bluetooth access was blocked. The page must be served over HTTPS or localhost.';
-    if (error.name === 'NetworkError') return 'Connection failed. Make sure the device is on, in range, and not connected to another app.';
+    if (error.name === 'NetworkError') {
+      return `Connection failed — the cooker dropped the link. Gen 3 cookers do this when a pairing prompt is declined or ignored. (Chrome said: ${error.message})`;
+    }
     return error.message;
   }
   return String(error);
