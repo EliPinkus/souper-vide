@@ -1,0 +1,81 @@
+# Undocumented Gen 3 layout (Anova Precision Cooker Nano 3.0, 800 W)
+
+Findings from a live unit. **None of this is published by Anova** — it was
+obtained by enumerating characteristics and writing inert payloads to a
+connected cooker. Treat every inference here as provisional.
+
+## How this device differs from the documented Mini
+
+Anova's [developer-project-mini](https://github.com/anova-culinary/developer-project-mini)
+reference describes service `910772a8-a5e7-49a7-bc6d-701e9a783a5c` with six
+characteristics, most of them **readable**: you poll STATE, CURRENT_TEMPERATURE
+and TIMER and get JSON back.
+
+This unit exposes the same service UUID and **none of those six
+characteristics**. Instead it has seven, only one of which is readable. The
+other six are `write` + `writeWithoutResponse` + `notify`: you write a command
+and the reply arrives as a notification on the same characteristic.
+
+A polling design cannot work here. That difference — not a wrong UUID, not a
+firmware quirk — is why a client built to the published Mini docs reads nothing
+at all from this cooker.
+
+## Characteristics
+
+| UUID | Properties | Notes |
+| --- | --- | --- |
+| `c7a9a65b-1e5b-4387-9c0d-d3f1f7e2e254` | read | Returns `{"pin":"6111"}` — the pairing PIN, served to any connected client without authentication |
+| `1877e8fa-abed-437c-8ae5-f4ec89daa1c2` | write, writeWithoutResponse, notify | Replies in the `result` dialect |
+| `511232d6-594e-4f90-8c57-c67b28505c6c` | write, writeWithoutResponse, notify | Replies in the `result` dialect |
+| `7e29a154-3eae-4ba8-90c3-d0763d57baf5` | write, writeWithoutResponse, notify | Replies in the `status` dialect |
+| `9596bdb9-c194-4aa2-b226-2e10b8d901dc` | write, writeWithoutResponse, notify | Accepted the write, sent nothing back |
+| `c6537d1c-e23b-48b6-8fa6-b0e544561810` | write, writeWithoutResponse, notify | Replies in the `status` dialect |
+| `dca82f2c-9406-11ec-b909-0242ac120002` | write, writeWithoutResponse, notify | Replies in the `status` dialect, distinct error code |
+
+## Encoding
+
+Unchanged from the documented protocol: a JSON object, UTF-8 encoded, then
+base64 encoded, with the base64 **text** as the characteristic value. Replies
+come back the same way.
+
+## Responses to an inert `{}` probe
+
+Writing `btoa("{}")` to each writable characteristic:
+
+| UUID | Reply |
+| --- | --- |
+| `1877e8fa…` | `{"result":"error","ERROR_CODE":1}` |
+| `511232d6…` | `{"result":"error","ERROR_CODE":1}` |
+| `7e29a154…` | `{"status":"error","ERROR_CODE":1}` |
+| `9596bdb9…` | *(silent)* |
+| `c6537d1c…` | `{"status":"error","ERROR_CODE":1}` |
+| `dca82f2c…` | `{"status":"error","ERROR_CODE":3}` |
+
+### What this establishes
+
+- The envelope is confirmed: base64-wrapped JSON, request and response, on the
+  same characteristic.
+- There are **two response dialects** — two channels key the outcome as
+  `result`, three as `status`. That suggests two separate command handlers
+  rather than one uniform interface.
+- `dca82f2c…` rejects an empty object with a **different code (3)** than the
+  others (1), so it validates against a different schema.
+- `9596bdb9…` accepts writes silently. Either it needs a well-formed command
+  before it will answer, or it is fire-and-forget.
+
+### What this does not establish
+
+Nothing here identifies which channel carries temperature, state, or timer, and
+no command vocabulary has been confirmed. Six channels against the six
+documented functions is suggestive and no more than that. `ERROR_CODE` values
+are uninterpreted.
+
+## Method notes
+
+- Characteristics of an already-permitted service can be enumerated from Web
+  Bluetooth, which is what made any of this visible.
+- Every probe so far has been inert: an empty object carries no command verb and
+  no setpoint, so it cannot start a cook.
+- Editing source triggers HMR, which drops the BLE connection and needs a user
+  gesture to restore. `window.__souperVideGen3` is exposed in dev builds so
+  experiments can run from the console instead.
