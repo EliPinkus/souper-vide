@@ -33,6 +33,9 @@ export class MiniTransport implements NanoTransport {
   private pendingTimerSeconds: number | null = null;
   /** Populated when the device matches none of Anova's documented UUIDs. */
   private discovery: CharacteristicReport[] | null = null;
+  /** Latest payload seen on each notifying characteristic, newest wins. */
+  private readonly notifications = new Map<string, NotificationRecord>();
+  private subscriptions: BluetoothRemoteGATTCharacteristic[] = [];
 
   constructor(service: BluetoothRemoteGATTService, available: Set<string>) {
     this.service = service;
@@ -61,8 +64,17 @@ export class MiniTransport implements NanoTransport {
       try {
         transport.discovery = await probeCharacteristics(service);
         console.info('[SouperVide] Undocumented Gen 3 layout. Probe:', transport.discovery);
+        // These characteristics are write+notify with no read, so the only way
+        // to see what they carry is to subscribe and wait. Purely passive.
+        await transport.listenToEverything(service);
       } catch (error) {
         console.warn('[SouperVide] Characteristic probe failed.', error);
+      }
+
+      // A live handle for working out an undocumented layout from the console,
+      // without a reload dropping the connection on every attempt.
+      if (import.meta.env.DEV) {
+        (window as unknown as Record<string, unknown>).__souperVideGen3 = { service, transport };
       }
     }
     // Anova's reference sets the clock immediately on connect. Do the same
@@ -73,7 +85,44 @@ export class MiniTransport implements NanoTransport {
   }
 
   dispose(): void {
-    // Nothing subscribed; reads are one-shot.
+    for (const characteristic of this.subscriptions) {
+      characteristic.removeEventListener('characteristicvaluechanged', this.handleNotification);
+      void characteristic.stopNotifications().catch(() => undefined);
+    }
+    this.subscriptions = [];
+  }
+
+  /** Subscribes to every notifying characteristic and records what arrives. */
+  private async listenToEverything(service: BluetoothRemoteGATTService): Promise<void> {
+    for (const characteristic of await service.getCharacteristics()) {
+      if (!characteristic.properties.notify) continue;
+      try {
+        characteristic.addEventListener('characteristicvaluechanged', this.handleNotification);
+        await characteristic.startNotifications();
+        this.subscriptions.push(characteristic);
+      } catch (error) {
+        console.warn(`[SouperVide] Could not subscribe to ${characteristic.uuid}`, error);
+      }
+    }
+  }
+
+  private handleNotification = (event: Event): void => {
+    const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+    if (!characteristic.value) return;
+
+    const decoded = decodeValue(characteristic.value);
+    const previous = this.notifications.get(characteristic.uuid);
+    this.notifications.set(characteristic.uuid, {
+      count: (previous?.count ?? 0) + 1,
+      encoding: decoded.encoding,
+      value: decoded.value,
+    });
+    console.info('[SouperVide] notify', characteristic.uuid, decoded);
+  };
+
+  /** Everything heard so far, for inspection. */
+  get heard(): Record<string, NotificationRecord> {
+    return Object.fromEntries(this.notifications);
   }
 
   /** Whether a UUID is present. Unknown enumeration means "try it and see". */
@@ -157,6 +206,7 @@ export class MiniTransport implements NanoTransport {
       raw: {
         characteristics: this.characteristicUuids,
         ...(this.discovery ? { discovery: this.discovery } : {}),
+        ...(this.notifications.size > 0 ? { notifications: this.heard } : {}),
         state,
         temperature,
         timer,
@@ -235,6 +285,12 @@ export class MiniTransport implements NanoTransport {
       false,
     );
   }
+}
+
+export interface NotificationRecord {
+  count: number;
+  encoding?: CharacteristicReport['encoding'];
+  value?: unknown;
 }
 
 export interface CharacteristicReport {
