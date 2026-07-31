@@ -46,6 +46,13 @@ export const MINI_CHARS = {
   systemInfo: '153c9432-7c83-4b88-9252-7588229d5473',
 } as const;
 
+/**
+ * The docs page and the reference implementation disagree on SET_CLOCK — `96c3`
+ * in prose, `96e3` in code — and at least one Nano 3.0 has neither. Both are
+ * tried, and its absence is tolerated.
+ */
+export const MINI_SET_CLOCK_ALT = 'd8a89692-cae8-4b74-96c3-0b99d3637793';
+
 export const ANOVA_CANDIDATE_SERVICES = [
   { uuid: NANO_SERVICE_UUID, label: 'Nano protobuf protocol' },
   { uuid: ANOVA_ASCII_SERVICE_UUID, label: 'ASCII serial protocol' },

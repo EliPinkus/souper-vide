@@ -1,4 +1,4 @@
-import { MINI_CHARS, type TempUnit } from './constants';
+import { MINI_CHARS, MINI_SET_CLOCK_ALT, type TempUnit } from './constants';
 import { EMPTY_SNAPSHOT, type NanoSnapshot, type NanoTransport } from './transport';
 
 /**
@@ -8,7 +8,7 @@ import { EMPTY_SNAPSHOT, type NanoSnapshot, type NanoTransport } from './transpo
  * base64 *text* is what goes on the wire. Reads come back the same way. There
  * are no notifications here — state is polled by reading characteristics.
  *
- * Field names below that are confirmed by the reference implementation:
+ * Field names confirmed by the reference implementation:
  *   CURRENT_TEMPERATURE -> { "current": number }
  *   STATE               -> { "temperatureUnit": "C" | "F", ... }
  *   set temperature     -> { "setpoint": number }
@@ -16,30 +16,62 @@ import { EMPTY_SNAPSHOT, type NanoSnapshot, type NanoTransport } from './transpo
  *   start               -> { "command": "start", "payload": { setpoint, timer, cookableId, cookableType } }
  *   stop                -> { "command": "stop" }
  *
- * The rest of the STATE and TIMER schemas are not published, so those are read
- * defensively and the raw JSON is kept on the snapshot for inspection.
+ * Not every Gen 3 unit implements every characteristic — a Nano 3.0 has been
+ * seen without SET_CLOCK in either of its two documented UUIDs. So the
+ * characteristic list is enumerated on connect and everything optional
+ * degrades rather than aborting the connection. The remaining STATE and TIMER
+ * schemas are unpublished, so those are read defensively and the raw JSON is
+ * kept on the snapshot for inspection.
  */
 export class MiniTransport implements NanoTransport {
   readonly label = 'Gen 3 JSON protocol (Mini / Nano 3.0)';
 
   private readonly service: BluetoothRemoteGATTService;
+  /** Lowercased UUIDs the device actually exposes; empty means "unknown". */
+  private readonly available: Set<string>;
   /** The Mini only accepts a timer as part of `start`, so it is held here. */
   private pendingTimerSeconds: number | null = null;
 
-  constructor(service: BluetoothRemoteGATTService) {
+  constructor(service: BluetoothRemoteGATTService, available: Set<string>) {
     this.service = service;
+    this.available = available;
   }
 
   static async attach(service: BluetoothRemoteGATTService): Promise<MiniTransport> {
-    const transport = new MiniTransport(service);
-    // Anova's reference sets the clock immediately on connect, before anything
-    // else, so this mirrors that rather than risking undefined behaviour.
+    // Characteristics of an already-permitted service can be enumerated, so ask
+    // the device what it implements instead of assuming the reference's list.
+    let available = new Set<string>();
+    try {
+      const characteristics = await service.getCharacteristics();
+      available = new Set(characteristics.map((entry) => entry.uuid.toLowerCase()));
+      console.info('[SouperVide] Gen 3 characteristics found:', [...available]);
+    } catch {
+      // Enumeration unsupported; fall back to blind lookups.
+    }
+
+    const transport = new MiniTransport(service, available);
+    // Anova's reference sets the clock immediately on connect. Do the same
+    // where possible, but never let its absence block the connection — it is
+    // housekeeping, not a prerequisite for reading or controlling the cooker.
     await transport.setClock();
     return transport;
   }
 
   dispose(): void {
     // Nothing subscribed; reads are one-shot.
+  }
+
+  /** Whether a UUID is present. Unknown enumeration means "try it and see". */
+  private has(uuid: string): boolean {
+    return this.available.size === 0 || this.available.has(uuid.toLowerCase());
+  }
+
+  private firstAvailable(...uuids: string[]): string | null {
+    return uuids.find((uuid) => this.has(uuid)) ?? null;
+  }
+
+  get characteristicUuids(): string[] {
+    return [...this.available];
   }
 
   // ---------------------------------------------------------------- transport
@@ -53,12 +85,14 @@ export class MiniTransport implements NanoTransport {
     else await characteristic.writeValueWithoutResponse(encoded);
   }
 
+  /** Returns `{}` for a characteristic the device does not have or cannot read. */
   private async readJson(uuid: string): Promise<Record<string, unknown>> {
-    const characteristic = await this.service.getCharacteristic(uuid);
-    const view = await characteristic.readValue();
-    const text = new TextDecoder().decode(view).trim();
-    if (text.length === 0) return {};
+    if (!this.has(uuid)) return {};
     try {
+      const characteristic = await this.service.getCharacteristic(uuid);
+      const view = await characteristic.readValue();
+      const text = new TextDecoder().decode(view).trim();
+      if (text.length === 0) return {};
       const parsed: unknown = JSON.parse(atob(text));
       return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
     } catch {
@@ -67,8 +101,18 @@ export class MiniTransport implements NanoTransport {
   }
 
   private async setClock(): Promise<void> {
+    const uuid = this.firstAvailable(MINI_CHARS.setClock, MINI_SET_CLOCK_ALT);
+    if (!uuid) {
+      console.info('[SouperVide] No SET_CLOCK characteristic on this cooker; skipping clock sync.');
+      return;
+    }
+
     const currentTime = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
-    await this.writeJson(MINI_CHARS.setClock, { currentTime }, true);
+    try {
+      await this.writeJson(uuid, { currentTime }, true);
+    } catch (error) {
+      console.warn('[SouperVide] Clock sync failed; continuing without it.', error);
+    }
   }
 
   // ----------------------------------------------------------------- commands
@@ -95,12 +139,24 @@ export class MiniTransport implements NanoTransport {
       targetTemp: pickNumber(state, ['setpoint', 'targetTemperature', 'target']),
       timerMinutes: timerSeconds === null ? null : Math.round(timerSeconds / 60),
       isCooking: parseRunning(state),
-      raw: { state, temperature, timer },
+      raw: { characteristics: this.characteristicUuids, state, temperature, timer },
     };
   }
 
+  /** Fails loudly, unlike the reads: a silent no-op on a control is worse. */
+  private requireCharacteristic(uuid: string, what: string): string {
+    if (!this.has(uuid)) {
+      throw new Error(`This cooker does not expose the ${what} characteristic (${uuid}).`);
+    }
+    return uuid;
+  }
+
   async setTargetTemp(temp: number): Promise<void> {
-    await this.writeJson(MINI_CHARS.setTemperature, { setpoint: temp }, false);
+    await this.writeJson(
+      this.requireCharacteristic(MINI_CHARS.setTemperature, 'set-temperature'),
+      { setpoint: temp },
+      false,
+    );
   }
 
   /**
@@ -116,7 +172,7 @@ export class MiniTransport implements NanoTransport {
 
   async setUnit(unit: TempUnit): Promise<void> {
     await this.writeJson(
-      MINI_CHARS.state,
+      this.requireCharacteristic(MINI_CHARS.state, 'state'),
       { command: 'changeUnit', payload: { temperatureUnit: unit } },
       false,
     );
@@ -137,7 +193,7 @@ export class MiniTransport implements NanoTransport {
       0;
 
     await this.writeJson(
-      MINI_CHARS.state,
+      this.requireCharacteristic(MINI_CHARS.state, 'state'),
       {
         command: 'start',
         payload: {
@@ -152,7 +208,11 @@ export class MiniTransport implements NanoTransport {
   }
 
   async stopCooking(): Promise<void> {
-    await this.writeJson(MINI_CHARS.state, { command: 'stop' }, false);
+    await this.writeJson(
+      this.requireCharacteristic(MINI_CHARS.state, 'state'),
+      { command: 'stop' },
+      false,
+    );
   }
 }
 

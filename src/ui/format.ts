@@ -66,6 +66,12 @@ export function describeError(error: unknown): string {
     // selection that failed to complete, so its own wording is the only thing
     // that distinguishes them. Never discard it — quote it and add the hint.
     if (error.name === 'NotFoundError') {
+      // Chrome also raises NotFoundError when a GATT service or characteristic
+      // lookup misses, which has nothing to do with the chooser. Suggesting the
+      // unfiltered device list there sends people entirely the wrong way.
+      if (/Service|Characteristic/i.test(error.message)) {
+        return `The device connected, but is missing something this app expected. That usually means it is a variant with a different characteristic layout. (Chrome said: ${error.message})`;
+      }
       const cancelled = /cancell?ed/i.test(error.message);
       const hint = cancelled
         ? 'If you did click Pair rather than cancelling, the cooker most likely stopped advertising before the selection completed — reset it and try again straight away.'
