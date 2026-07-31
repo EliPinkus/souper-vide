@@ -95,6 +95,41 @@ Responses are also strictly same-channel: writing to one never produces a
 notification on another, so these are six independent endpoints, not a
 write-here/read-there pair.
 
+### The one relevant line in Anova's docs
+
+The Nano pages say nothing about authorization — they document the protobuf
+protocol this hardware does not speak. The **Mini** pages, which cover this
+service, contain exactly one auth-adjacent statement, on the BLE protocol page:
+
+> The Mini requires explicit pairing acceptance on the host device. Watch for
+> and accept the pairing prompt to maintain connection.
+
+and, in the reference implementation's README:
+
+> When prompted during connection, please accept pairing on your host computer.
+> Otherwise, the Anova Precision® Cooker Mini will disconnect.
+
+This fits the observations. During probing the cooker **dropped the link
+unprompted**, which is precisely the documented consequence of pairing not being
+accepted. A device that requires a bonded link, and is not bonded, would reject
+every command identically regardless of content and eventually hang up — which
+is exactly the behaviour recorded above.
+
+The published `{"pin":"6111"}` is then not an application credential at all. It
+is the passkey for host-level BLE bonding, which is why sending it as a payload
+in any shape changed nothing.
+
+### The Web Bluetooth problem this creates
+
+Bonding is initiated by the OS, normally when something accesses a
+characteristic that demands encryption. Every write here **succeeds** at the
+GATT layer and is refused at the application layer, so nothing ever demands
+encryption and macOS is never given a reason to bond. Web Bluetooth exposes no
+API to request bonding explicitly.
+
+If that reading is right, the browser cannot get there on its own, and the bond
+has to be established at the OS level first — after which Chrome would reuse it.
+
 ### What remains
 
 An authorization gate ahead of the command handler, whose credential is not
