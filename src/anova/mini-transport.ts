@@ -31,6 +31,8 @@ export class MiniTransport implements NanoTransport {
   private readonly available: Set<string>;
   /** The Mini only accepts a timer as part of `start`, so it is held here. */
   private pendingTimerSeconds: number | null = null;
+  /** Populated when the device matches none of Anova's documented UUIDs. */
+  private discovery: CharacteristicReport[] | null = null;
 
   constructor(service: BluetoothRemoteGATTService, available: Set<string>) {
     this.service = service;
@@ -50,6 +52,19 @@ export class MiniTransport implements NanoTransport {
     }
 
     const transport = new MiniTransport(service, available);
+
+    // If none of the documented characteristics are present, this is a variant
+    // Anova has not published. Read what it does have so the layout is visible
+    // rather than leaving every field silently empty.
+    const documented = Object.values(MINI_CHARS).map((uuid) => uuid.toLowerCase());
+    if (available.size > 0 && !documented.some((uuid) => available.has(uuid))) {
+      try {
+        transport.discovery = await probeCharacteristics(service);
+        console.info('[SouperVide] Undocumented Gen 3 layout. Probe:', transport.discovery);
+      } catch (error) {
+        console.warn('[SouperVide] Characteristic probe failed.', error);
+      }
+    }
     // Anova's reference sets the clock immediately on connect. Do the same
     // where possible, but never let its absence block the connection — it is
     // housekeeping, not a prerequisite for reading or controlling the cooker.
@@ -139,7 +154,13 @@ export class MiniTransport implements NanoTransport {
       targetTemp: pickNumber(state, ['setpoint', 'targetTemperature', 'target']),
       timerMinutes: timerSeconds === null ? null : Math.round(timerSeconds / 60),
       isCooking: parseRunning(state),
-      raw: { characteristics: this.characteristicUuids, state, temperature, timer },
+      raw: {
+        characteristics: this.characteristicUuids,
+        ...(this.discovery ? { discovery: this.discovery } : {}),
+        state,
+        temperature,
+        timer,
+      },
     };
   }
 
@@ -214,6 +235,80 @@ export class MiniTransport implements NanoTransport {
       false,
     );
   }
+}
+
+export interface CharacteristicReport {
+  uuid: string;
+  properties: string[];
+  encoding?: 'base64-json' | 'json' | 'text' | 'bytes';
+  value?: unknown;
+  error?: string;
+}
+
+/**
+ * Reads every characteristic on the service and reports its properties and
+ * decoded value.
+ *
+ * Anova's published UUIDs do not cover every unit in the field, so on hardware
+ * that matches none of them the only way forward is to ask the device what it
+ * has and look at what comes back. Read-only: nothing here writes.
+ */
+export async function probeCharacteristics(
+  service: BluetoothRemoteGATTService,
+): Promise<CharacteristicReport[]> {
+  const reports: CharacteristicReport[] = [];
+
+  for (const characteristic of await service.getCharacteristics()) {
+    const flags: Record<string, boolean> = {
+      read: characteristic.properties.read,
+      write: characteristic.properties.write,
+      writeWithoutResponse: characteristic.properties.writeWithoutResponse,
+      notify: characteristic.properties.notify,
+      indicate: characteristic.properties.indicate,
+    };
+    const report: CharacteristicReport = {
+      uuid: characteristic.uuid,
+      properties: Object.keys(flags).filter((key) => flags[key]),
+    };
+
+    if (characteristic.properties.read) {
+      try {
+        Object.assign(report, decodeValue(await characteristic.readValue()));
+      } catch (error) {
+        report.error = (error as Error).message;
+      }
+    }
+
+    reports.push(report);
+  }
+
+  return reports;
+}
+
+/** Tries each encoding Anova is known to use, then falls back to raw bytes. */
+function decodeValue(view: DataView): Partial<CharacteristicReport> {
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  const text = new TextDecoder().decode(bytes).trim();
+
+  if (text.length > 0) {
+    try {
+      return { encoding: 'base64-json', value: JSON.parse(atob(text)) };
+    } catch {
+      // not base64-wrapped JSON
+    }
+    try {
+      return { encoding: 'json', value: JSON.parse(text) };
+    } catch {
+      // not bare JSON
+    }
+    // Printable ASCII only — otherwise it is binary that happened to decode.
+    if (/^[\x20-\x7e\s]*$/.test(text)) return { encoding: 'text', value: text };
+  }
+
+  return {
+    encoding: 'bytes',
+    value: [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join(' '),
+  };
 }
 
 /** Reads the first of `keys` that holds a finite number. */
