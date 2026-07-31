@@ -53,6 +53,17 @@ export const MINI_CHARS = {
  */
 export const MINI_SET_CLOCK_ALT = 'd8a89692-cae8-4b74-96c3-0b99d3637793';
 
+/** Standard Device Information service — model and firmware strings. */
+export const ANOVA_DEVICE_INFO_SERVICE = 0x180a;
+export const ANOVA_DEVICE_INFO_CHARS: Record<string, number> = {
+  manufacturer: 0x2a29,
+  model: 0x2a24,
+  serial: 0x2a25,
+  hardwareRevision: 0x2a27,
+  firmwareRevision: 0x2a26,
+  softwareRevision: 0x2a28,
+};
+
 export const ANOVA_CANDIDATE_SERVICES = [
   { uuid: NANO_SERVICE_UUID, label: 'Nano protobuf protocol' },
   { uuid: ANOVA_ASCII_SERVICE_UUID, label: 'ASCII serial protocol' },

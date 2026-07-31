@@ -3,6 +3,8 @@ import { AsciiTransport } from './ascii-transport';
 import {
   ANOVA_ASCII_SERVICE_UUID,
   ANOVA_CANDIDATE_SERVICES,
+  ANOVA_DEVICE_INFO_CHARS,
+  ANOVA_DEVICE_INFO_SERVICE,
   ANOVA_MINI_SERVICE_UUID,
   NANO_SERVICE_UUID,
   type TempUnit,
@@ -63,6 +65,9 @@ export class NanoClient {
   /** Set optimistically by start/stop, for protocols that cannot report it. */
   private assumeCooking: boolean | null = null;
 
+  /** Standard Device Information strings, when the cooker publishes them. */
+  deviceInfo: Record<string, string> | null = null;
+
   private readonly events: NanoClientEvents;
 
   constructor(events: NanoClientEvents = {}) {
@@ -83,7 +88,12 @@ export class NanoClient {
 
     // Every candidate service has to be declared up front: Web Bluetooth will
     // not let you enumerate, or even look up, a service you did not ask for.
-    const optionalServices = ANOVA_CANDIDATE_SERVICES.map((candidate) => candidate.uuid);
+    const optionalServices: BluetoothServiceUUID[] = [
+      ...ANOVA_CANDIDATE_SERVICES.map((candidate) => candidate.uuid),
+      // Standard Device Information: model and firmware strings identify which
+      // hardware revision a cooker actually is, which the box does not.
+      ANOVA_DEVICE_INFO_SERVICE,
+    ];
 
     // Filters match only advertised data, and Anova does not document whether
     // its cookers advertise their service UUIDs. Filters are OR'd, so the name
@@ -115,11 +125,33 @@ export class NanoClient {
     if (!this.device?.gatt) throw new Error('Device does not expose a GATT server.');
 
     this.server = await this.device.gatt.connect();
+    await this.readDeviceInfo(this.server);
     this.transport = await this.selectTransport(this.server);
 
     this.status = { ...this.status, protocol: this.transport.label };
     await this.refresh();
     this.startPolling();
+  }
+
+  /** Best-effort: absence of Device Information is not an error. */
+  private async readDeviceInfo(server: BluetoothRemoteGATTServer): Promise<void> {
+    try {
+      const service = await server.getPrimaryService(ANOVA_DEVICE_INFO_SERVICE);
+      const decoder = new TextDecoder();
+      const info: Record<string, string> = {};
+      for (const [name, uuid] of Object.entries(ANOVA_DEVICE_INFO_CHARS)) {
+        try {
+          const characteristic = await service.getCharacteristic(uuid);
+          info[name] = decoder.decode(await characteristic.readValue()).replace(/\s+$/, '');
+        } catch {
+          // characteristic absent
+        }
+      }
+      this.deviceInfo = info;
+      console.info('[SouperVide] Anova device information:', info);
+    } catch {
+      console.info('[SouperVide] No Device Information service on this cooker.');
+    }
   }
 
   /**

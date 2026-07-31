@@ -70,6 +70,43 @@ no command vocabulary has been confirmed. Six channels against the six
 documented functions is suggestive and no more than that. `ERROR_CODE` values
 are uninterpreted.
 
+## Write probes: everything is rejected identically
+
+Each writable channel was sent, in turn: an empty object, zero bytes,
+unparseable text, four different command-envelope keys (`command`, `cmd`,
+`type`, `method`), the published PIN in six shapes, and the documented
+payloads `{"currentTime":…}` and `{"setpoint":50}`. Both base64-wrapped and raw.
+
+**Every write returned that channel's fixed error, byte for byte.** Zero bytes
+and valid JSON are indistinguishable to it.
+
+### What that rules out
+
+The firmware is not parsing the payload at all — it rejects before looking. So:
+
+- It is not a JSON schema problem. No key name or nesting will help.
+- It is not an encoding problem. Raw and base64 fare identically.
+- It is not the command vocabulary. An unknown verb and a documented one get
+  the same answer.
+- The published PIN is not a session credential, in any field name or type
+  tried, on any channel including the silent one.
+
+Responses are also strictly same-channel: writing to one never produces a
+notification on another, so these are six independent endpoints, not a
+write-here/read-there pair.
+
+### What remains
+
+An authorization gate ahead of the command handler, whose credential is not
+derivable from anything the device exposes over BLE. Anova's app presumably
+establishes it — plausibly bound to an account, a cloud-issued token, or a
+bonding state a browser cannot reach.
+
+Blind payload search is exhausted. Confirming this needs a capture of the real
+app talking to the cooker: an Android HCI snoop log, or macOS PacketLogger from
+Apple's Additional Tools for Xcode, recorded while the Anova app drives it.
+That yields the exact handshake instead of another guess.
+
 ## Method notes
 
 - Characteristics of an already-permitted service can be enumerated from Web
